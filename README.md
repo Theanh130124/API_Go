@@ -12,3 +12,33 @@ truy vấn thì nên đánh index -> trên các cột có where -> hay dùng whe
 
 dùng explain
 select  * from ... where status = 'Doing' 
+
+Gin Framework 
+
+Thêm vào go.mod 
+
+```
+"github.com/gin-gonic/gin"
+```
+
+main.go  -> API đầu tiên
+
+
+``
+  r := gin.Default()
+  r.GET("/ping", func(c *gin.Context) {
+    c.JSON(http.StatusOK, gin.H{
+      "message": "pong",
+    })
+  })
+  r.Run() // listen and serve on 0.0.0.0:8080 (for windows "localhost:8080")
+``
+
+
+
+<h1>Install GORM </h1>
+go get -u gorm.io/gorm
+
+Cài driver với mysql
+
+go get -u gorm.io/driver/mysql
