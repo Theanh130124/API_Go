@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	//"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
@@ -13,14 +14,60 @@ import (
 	"time"
 )
 
+type ItemStatus int
+
+const (
+	ItemStatusDoing ItemStatus = iota
+	ItemStatusDone
+	ItemStatusDeleted
+)
+
+// Thực hiện parse từ int thằng String cho enum
+func (item *ItemStatus) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf("\"%s\"", item.String())), nil
+}
+
+//Do trc đó mình đã set Status là string giờ là int nên mysql không the scan
+// -> để scan cần có
+
+var allItemStatus = [3]string{"Doing", "Done", "Deleted"}
+
+func (item ItemStatus) String() string {
+	return allItemStatus[item]
+}
+func parseItemStatus(status string) (ItemStatus, error) {
+	for i := range allItemStatus {
+		if allItemStatus[i] == status {
+			return ItemStatus(i), nil
+		}
+	}
+	return ItemStatus(0), errors.New("Invalid Item Status")
+}
+
+func (item *ItemStatus) Scan(value interface{}) error {
+	bytes, ok := value.([]byte)
+	if !ok {
+		return errors.New(fmt.Sprint("Failed to unmarshal JSONB value:", value))
+	}
+
+	v, err := parseItemStatus(string(bytes))
+
+	if err != nil {
+		return errors.New(fmt.Sprint("Failed to unmarshal JSONB value:", value))
+	}
+	*item = v
+	return nil
+
+}
+
 // Phần json là tên key gửi trên postman
 type TodoItem struct {
-	Id          int        `json:"id"` //that ra khong can dien gorm -> vì nó đã tự map đúng name json
-	Title       string     `json:"title"`
-	Description string     `json:"description"`
-	Status      string     `json:"status"`
-	CreateAt    *time.Time `json:"create_at"`            //hiện time null json nếu không có
-	UpdateAt    *time.Time `json:"update_at ,omitempty"` // omitempty bỏ nil  , bỏ false , bỏ qua chuoi rong
+	Id          int         `json:"id"` //that ra khong can dien gorm -> vì nó đã tự map đúng name json
+	Title       string      `json:"title"`
+	Description string      `json:"description"`
+	Status      *ItemStatus `json:"status"`               //lấy * để có thể null
+	CreateAt    *time.Time  `json:"create_at"`            //hiện time null json nếu không có
+	UpdateAt    *time.Time  `json:"update_at ,omitempty"` // omitempty bỏ nil  , bỏ false , bỏ qua chuoi rong
 }
 
 // Nhận json body từ sv vào structure (binh thuong gorm khong can ghi no tu scan)
