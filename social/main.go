@@ -14,7 +14,7 @@ import (
 )
 
 type TodoItem struct {
-	Id          int        `json:"id"`
+	Id          int        `json:"id"` //that ra khong can dien gorm -> vì nó đã tự map đúng name json
 	Title       string     `json:"title"`
 	Description string     `json:"description"`
 	Status      string     `json:"status"`
@@ -24,18 +24,24 @@ type TodoItem struct {
 
 // Nhận json body từ sv vào structure (binh thuong gorm khong can ghi no tu scan)
 
-// "-" la khong cho truyen tren body
 type TodoItemCreation struct {
-	Id          int    `json:"-" gorm:"id"`
+	//Du lieu trong postman se la cac truong nay
+	Id          int    `json:"-" gorm:"id"` //Tao khong can truyen id nen ->  "-" la khong truyen gi
 	Title       string `json:"title" gorm:"column:title"`
 	Description string `json:"description" gorm:"column:description"`
 	//Status      string `json:"status" gorm:"column:status"`
 }
 
+type TodoItemUpdate struct {
+	Title       string  `json:"title"`
+	Description *string `json:"description"` //vì gorm sẽ dưa vào chuỗi rỗng hoặc khác new để (bỏ qua update ) khi là con trỏ thì sẽ trỏ tới 1 giá trị new -> gorm sẽ update dù chơi chuỗi rỗng
+	Status      string  `json:"status"`
+}
+
 //Dùng chung
 
 func (TodoItem) TableName() string {
-	return "todo_items" // ten bang
+	return "todo_items" // ten bang sẽ tác động đến
 }
 
 //Hàm để GORM insert struct xuống db
@@ -43,24 +49,29 @@ func (TodoItem) TableName() string {
 // func(reciver) function_name kieuDL
 func (TodoItemCreation) TableName() string {
 	return TodoItem{}.TableName() // ten bang luc nay cung la todo_items
+	//ToDoItem tác động lên bảng todo_items nên mình chỉ cần return TableName(vì thằng này cũng cần bảng todo_items)
+}
+
+func (TodoItemUpdate) TableName() string {
+	return TodoItem{}.TableName()
 }
 
 func CreateItem(db *gorm.DB) func(context *gin.Context) {
 
 	return func(context *gin.Context) {
-		var data TodoItemCreation
-		//ShouldBind dang any form data hay json cung duoc
-		if err := context.ShouldBind(&data); err != nil {
+		var data TodoItemCreation // truyen struct can lam viec
+		//ShouldBind dạng any gửi form-data hay json cũng được
+		if err := context.ShouldBind(&data); err != nil { // có lỗi
 			context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 
-		if err := db.Create(&data).Error; err != nil {
+		if err := db.Create(&data).Error; err != nil { //Create truyền dữ liệu phải là &data (rút con trỏ để dữ liêu tác động thật vào db)
 			context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 		context.JSON(http.StatusOK, gin.H{
-			"data": data.Id,
+			"data": data.Id, //đã tạo data với Id.
 		})
 	}
 }
@@ -68,15 +79,17 @@ func CreateItem(db *gorm.DB) func(context *gin.Context) {
 func GetItem(db *gorm.DB) func(*gin.Context) {
 
 	return func(context *gin.Context) {
-		var data = TodoItem{}                        //Nhan data
-		id, err := strconv.Atoi(context.Param("id")) //lay params
+		var data = TodoItem{} //Nhan data
+		//err != null ->  co loi xay ra
+		id, err := strconv.Atoi(context.Param("id")) //lay params id
 		if err != nil {                              // neu null
 			context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 		//db.Where("id = ?", id).First(&data)  hoăc
-		data.Id = id
-		if err := db.First(&data).Error; err != nil {
+		data.Id = id // tim kiem o dk id (Thay vì mình viet như nay minh se viet Where trong kia cai nao cũng đc )
+
+		if err := db.First(&data).Error; err != nil { //db.First (tim kiem 1 hang theo id)
 			context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -87,6 +100,81 @@ func GetItem(db *gorm.DB) func(*gin.Context) {
 
 	}
 
+}
+func UpdateItem(db *gorm.DB) func(context *gin.Context) {
+	return func(context *gin.Context) {
+		var data = TodoItemUpdate{} //Nhan data
+		//err != null ->  co loi xay ra
+		id, err := strconv.Atoi(context.Param("id")) //lay params id
+		if err != nil {                              // neu null
+			context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		//ShouldBind dạng any gửi form-data hay json cũng được
+		if err := context.ShouldBind(&data); err != nil { // có lỗi
+			context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		//db.Where("id = ?", id).First(&data)  hoăc
+		//data.Id = id                                 //Thay vì viết data.Id = id
+		//Updates -> truyền gì thì update cái đó (không truyền k update)
+		if err := db.Where("id =?", id).Updates(&data).Error; err != nil {
+			context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		context.JSON(http.StatusOK, gin.H{
+			"data": true,
+		})
+
+	}
+}
+
+// Xóa luôn khỏi todo
+func DeleteItem(db *gorm.DB) func(*gin.Context) {
+
+	return func(context *gin.Context) {
+		id, err := strconv.Atoi(context.Param("id")) //lay params id
+		if err != nil {                              // neu null
+			context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		//Do mình không có struct nào để quét nên phải chỉ rõ table nào nó làm việc
+		if err := db.Table(TodoItem{}.TableName()).Where("id = ?", id).Delete(nil).Error; err != nil { //db.First (tim kiem 1 hang theo id)
+			context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		context.JSON(http.StatusOK, gin.H{
+			"data": true,
+		})
+
+	}
+
+}
+
+// Thât ra là update nhưng trang thái Deleted
+func DeleteShortItem(db *gorm.DB) func(*gin.Context) {
+
+	return func(context *gin.Context) {
+		id, err := strconv.Atoi(context.Param("id")) //lay params id
+		if err != nil {                              // neu null
+			context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		//Do mình không có struct nào để quét nên phải chỉ rõ table nào nó làm việc (map có key là string và value la interface (là gì cũng đc)
+		if err := db.Table(TodoItem{}.TableName()).Where("id = ?", id).Updates(map[string]interface{}{"status": "Deleted"}).Error; err != nil { //db.First (tim kiem 1 hang theo id)
+			context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		context.JSON(http.StatusOK, gin.H{
+			"data": true,
+		})
+
+	}
 }
 
 func main() {
@@ -144,8 +232,8 @@ func main() {
 
 		items.GET("")
 		items.GET("/:id", GetItem(db))
-		items.PATCH("/:id")
-		items.DELETE("/:id")
+		items.PATCH("/:id", UpdateItem(db))
+		items.DELETE("/:id", DeleteItem(db))
 
 	}
 
