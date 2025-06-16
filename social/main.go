@@ -13,6 +13,7 @@ import (
 	"time"
 )
 
+// Phần json là tên key gửi trên postman
 type TodoItem struct {
 	Id          int        `json:"id"` //that ra khong can dien gorm -> vì nó đã tự map đúng name json
 	Title       string     `json:"title"`
@@ -36,6 +37,23 @@ type TodoItemUpdate struct {
 	Title       string  `json:"title"`
 	Description *string `json:"description"` //vì gorm sẽ dưa vào chuỗi rỗng hoặc khác new để (bỏ qua update ) khi là con trỏ thì sẽ trỏ tới 1 giá trị new -> gorm sẽ update dù chơi chuỗi rỗng
 	Status      string  `json:"status"`
+}
+
+// Phân trang  -> (query string -> ?page=1&limit=3) muốn dùng query string cần form
+type Paging struct {
+	Page  int   `json:"page" form:"page"`
+	Limit int   `json:"limit" form:"limit"`
+	Total int64 `json:"total" form:"-"`
+}
+
+// Xử lý default (nếu không gửi page mặc định là)
+func (p *Paging) Process() {
+	if p.Page <= 0 {
+		p.Page = 1
+	}
+	if p.Limit <= 0 || p.Limit > 100 {
+		p.Limit = 10
+	}
 }
 
 //Dùng chung
@@ -177,6 +195,44 @@ func DeleteShortItem(db *gorm.DB) func(*gin.Context) {
 	}
 }
 
+func ListItem(db *gorm.DB) func(context *gin.Context) {
+
+	return func(context *gin.Context) {
+		var paging Paging
+
+		if err := context.ShouldBind(&paging); err != nil { // có lỗi
+			context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		paging.Process()
+		//Nếu không truyền gì mặc định là page 1 và limit = 10
+		var res []TodoItem // là các slide Todo( hay là List Item)
+
+		//Do cái deleteShort vẫn còn nên mình cần lọc ra
+
+		// <> là khác
+		db = db.Where("status <> ?", "Deleted")
+
+		//Find để tìm nhiều dòng dữ liệu và Order theo id desc (giảm -> mới trc)
+
+		if err := db.Table(TodoItem{}.TableName()).Count(&paging.Total).Error; err != nil {
+			context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		if err := db.Order("id desc").Offset((paging.Page - 1) * paging.Limit).
+			Limit(paging.Limit).Find(&res).Error; err != nil { //Create truyền dữ liệu phải là &data (rút con trỏ để dữ liêu tác động thật vào db)
+			context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		context.JSON(http.StatusOK, gin.H{
+			"paging": paging,
+			"data":   res, //đã tạo data với Id.
+
+		})
+	}
+}
+
 func main() {
 	dsn := os.Getenv("DB_CONN_STR")
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
@@ -230,9 +286,21 @@ func main() {
 
 		items.POST("", CreateItem(db))
 
-		items.GET("")
+		items.GET("", ListItem(db))
 		items.GET("/:id", GetItem(db))
 		items.PATCH("/:id", UpdateItem(db))
+		//Gin sẽ phân tích:
+		//
+		///deleteShort/1 → trùng với pattern /:id (vì :id là wildcard).
+		//
+		//Nó hiểu "deleteShort" là id, và gọi DeleteItem(db).
+		//
+		//Kết quả:
+		//
+		//Hàm DeleteItem(db) được gọi với id = "deleteShort" → lỗi strconv.Atoi("deleteShort") → lỗi 400 hoặc 404.
+		//
+		//Hàm DeleteShortItem sẽ không bao giờ được gọi, vì route /:id đã match trước rồi.
+		items.DELETE("/deleteShort/:id", DeleteShortItem(db)) // phai dat tren  items.DELETE("/:id", DeleteItem(db))
 		items.DELETE("/:id", DeleteItem(db))
 
 	}
