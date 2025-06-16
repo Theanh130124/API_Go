@@ -1,7 +1,11 @@
 package main
 
 import (
+	"database/sql/driver"
 	"errors"
+	"social/common"
+	"strings"
+
 	//"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
@@ -17,14 +21,28 @@ import (
 type ItemStatus int
 
 const (
-	ItemStatusDoing ItemStatus = iota
+	ItemStatusDoing ItemStatus = iota //iota là đếm tự động tăng dần
 	ItemStatusDone
 	ItemStatusDeleted
 )
 
-// Thực hiện parse từ int thằng String cho enum
+// Thực hiện parse từ int thành  String cho json data
 func (item *ItemStatus) MarshalJSON() ([]byte, error) {
+	if item == nil {
+		return nil, nil
+	}
 	return []byte(fmt.Sprintf("\"%s\"", item.String())), nil
+}
+
+// Từ json về dữ liệu
+func (item *ItemStatus) UnmarshalJSON(data []byte) error {
+	str := strings.ReplaceAll(string(data), "\"", "") // \" tương đương với dấu " " trong JSON
+	itemVal, err := parseItemStatus(str)
+	if err != nil {
+		return err
+	}
+	*item = itemVal
+	return nil
 }
 
 //Do trc đó mình đã set Status là string giờ là int nên mysql không the scan
@@ -32,9 +50,10 @@ func (item *ItemStatus) MarshalJSON() ([]byte, error) {
 
 var allItemStatus = [3]string{"Doing", "Done", "Deleted"}
 
-func (item ItemStatus) String() string {
-	return allItemStatus[item]
+func (item *ItemStatus) String() string {
+	return allItemStatus[*item]
 }
+
 func parseItemStatus(status string) (ItemStatus, error) {
 	for i := range allItemStatus {
 		if allItemStatus[i] == status {
@@ -60,6 +79,14 @@ func (item *ItemStatus) Scan(value interface{}) error {
 
 }
 
+// Lấy từ itemStauts chuyển thành dữ liệu mysql
+func (item *ItemStatus) Value() (driver.Value, error) {
+	if item == nil {
+		return nil, nil
+	}
+	return item.String(), nil
+}
+
 // Phần json là tên key gửi trên postman
 type TodoItem struct {
 	Id          int         `json:"id"` //that ra khong can dien gorm -> vì nó đã tự map đúng name json
@@ -74,33 +101,16 @@ type TodoItem struct {
 
 type TodoItemCreation struct {
 	//Du lieu trong postman se la cac truong nay
-	Id          int    `json:"-" gorm:"id"` //Tao khong can truyen id nen ->  "-" la khong truyen gi
-	Title       string `json:"title" gorm:"column:title"`
-	Description string `json:"description" gorm:"column:description"`
-	//Status      string `json:"status" gorm:"column:status"`
+	Id          int         `json:"-" gorm:"id"` //Tao khong can truyen id nen ->  "-" la khong truyen gi
+	Title       string      `json:"title" gorm:"column:title"`
+	Description string      `json:"description" gorm:"column:description"`
+	Status      *ItemStatus `json:"status" gorm:"column:status"`
 }
 
 type TodoItemUpdate struct {
 	Title       string  `json:"title"`
 	Description *string `json:"description"` //vì gorm sẽ dưa vào chuỗi rỗng hoặc khác new để (bỏ qua update ) khi là con trỏ thì sẽ trỏ tới 1 giá trị new -> gorm sẽ update dù chơi chuỗi rỗng
 	Status      string  `json:"status"`
-}
-
-// Phân trang  -> (query string -> ?page=1&limit=3) muốn dùng query string cần form
-type Paging struct {
-	Page  int   `json:"page" form:"page"`
-	Limit int   `json:"limit" form:"limit"`
-	Total int64 `json:"total" form:"-"`
-}
-
-// Xử lý default (nếu không gửi page mặc định là)
-func (p *Paging) Process() {
-	if p.Page <= 0 {
-		p.Page = 1
-	}
-	if p.Limit <= 0 || p.Limit > 100 {
-		p.Limit = 10
-	}
 }
 
 //Dùng chung
@@ -245,7 +255,7 @@ func DeleteShortItem(db *gorm.DB) func(*gin.Context) {
 func ListItem(db *gorm.DB) func(context *gin.Context) {
 
 	return func(context *gin.Context) {
-		var paging Paging
+		var paging common.Paging
 
 		if err := context.ShouldBind(&paging); err != nil { // có lỗi
 			context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
