@@ -1,7 +1,12 @@
 package entity
 
 import (
+	"errors"
 	"social/common"
+)
+
+var (
+	ErrTitleIsBlank = errors.New("title cannot blank")
 )
 
 // Phần json là tên key gửi trên postman

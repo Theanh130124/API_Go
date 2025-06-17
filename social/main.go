@@ -3,6 +3,8 @@ package main
 import (
 	"social/common"
 	"social/modules/item/entity"
+	"social/modules/item/transport/ginItem"
+
 	//"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
@@ -13,24 +15,6 @@ import (
 	"os"
 	"strconv"
 )
-
-func CreateItem(db *gorm.DB) func(context *gin.Context) {
-
-	return func(context *gin.Context) {
-		var data entity.TodoItemCreation // truyen struct can lam viec
-		//ShouldBind dạng any gửi form-data hay json cũng được
-		if err := context.ShouldBind(&data); err != nil { // có lỗi
-			context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-
-		if err := db.Create(&data).Error; err != nil { //Create truyền dữ liệu phải là &data (rút con trỏ để dữ liêu tác động thật vào db)
-			context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		context.JSON(http.StatusOK, common.SimpleSuccessResponse(data)) //hoac data.Id (thi chi hien id)
-	}
-}
 
 func GetItem(db *gorm.DB) func(*gin.Context) {
 
@@ -210,7 +194,7 @@ func main() {
 	{
 		items := api.Group("/items")
 
-		items.POST("", CreateItem(db))
+		items.POST("", ginItem.CreateItem(db))
 
 		items.GET("", ListItem(db))
 		items.GET("/:id", GetItem(db))
@@ -233,9 +217,9 @@ func main() {
 
 	r.GET("/ping", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
-			"message": "TEST", // gin.H -> gin.map("key" : value)
+			"message": "TEST", // ginItem.H -> ginItem.map("key" : value)
 		})
 	})
 	r.Run(":8000")
-	//gin.SetMode(gin.ReleaseMode)  -> tắt debug bằng False
+	//ginItem.SetMode(ginItem.ReleaseMode)  -> tắt debug bằng False
 }
