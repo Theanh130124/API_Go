@@ -42,3 +42,11 @@ go get -u gorm.io/gorm
 Cài driver với mysql
 
 go get -u gorm.io/driver/mysql
+
+
+
+Clean architecture
+![img.png](img.png)
+
+![img_1.png](img_1.png)
+

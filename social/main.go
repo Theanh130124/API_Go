@@ -1,11 +1,8 @@
 package main
 
 import (
-	"database/sql/driver"
-	"errors"
 	"social/common"
-	"strings"
-
+	"social/modules/item/entity"
 	//"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
@@ -15,126 +12,12 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"time"
 )
-
-type ItemStatus int
-
-const (
-	ItemStatusDoing ItemStatus = iota //iota là đếm tự động tăng dần
-	ItemStatusDone
-	ItemStatusDeleted
-)
-
-// Thực hiện parse từ int thành  String cho json data
-func (item *ItemStatus) MarshalJSON() ([]byte, error) {
-	if item == nil {
-		return nil, nil
-	}
-	return []byte(fmt.Sprintf("\"%s\"", item.String())), nil
-}
-
-// Từ json về dữ liệu
-func (item *ItemStatus) UnmarshalJSON(data []byte) error {
-	str := strings.ReplaceAll(string(data), "\"", "") // \" tương đương với dấu " " trong JSON
-	itemVal, err := parseItemStatus(str)
-	if err != nil {
-		return err
-	}
-	*item = itemVal
-	return nil
-}
-
-//Do trc đó mình đã set Status là string giờ là int nên mysql không the scan
-// -> để scan cần có
-
-var allItemStatus = [3]string{"Doing", "Done", "Deleted"}
-
-func (item *ItemStatus) String() string {
-	return allItemStatus[*item]
-}
-
-func parseItemStatus(status string) (ItemStatus, error) {
-	for i := range allItemStatus {
-		if allItemStatus[i] == status {
-			return ItemStatus(i), nil
-		}
-	}
-	return ItemStatus(0), errors.New("Invalid Item Status")
-}
-
-func (item *ItemStatus) Scan(value interface{}) error {
-	bytes, ok := value.([]byte)
-	if !ok {
-		return errors.New(fmt.Sprint("Failed to unmarshal JSONB value:", value))
-	}
-
-	v, err := parseItemStatus(string(bytes))
-
-	if err != nil {
-		return errors.New(fmt.Sprint("Failed to unmarshal JSONB value:", value))
-	}
-	*item = v
-	return nil
-
-}
-
-// Lấy từ itemStauts chuyển thành dữ liệu mysql
-func (item *ItemStatus) Value() (driver.Value, error) {
-	if item == nil {
-		return nil, nil
-	}
-	return item.String(), nil
-}
-
-// Phần json là tên key gửi trên postman
-type TodoItem struct {
-	Id          int         `json:"id"` //that ra khong can dien gorm -> vì nó đã tự map đúng name json
-	Title       string      `json:"title"`
-	Description string      `json:"description"`
-	Status      *ItemStatus `json:"status"`               //lấy * để có thể null
-	CreateAt    *time.Time  `json:"create_at"`            //hiện time null json nếu không có
-	UpdateAt    *time.Time  `json:"update_at ,omitempty"` // omitempty bỏ nil  , bỏ false , bỏ qua chuoi rong
-}
-
-// Nhận json body từ sv vào structure (binh thuong gorm khong can ghi no tu scan)
-
-type TodoItemCreation struct {
-	//Du lieu trong postman se la cac truong nay
-	Id          int         `json:"-" gorm:"id"` //Tao khong can truyen id nen ->  "-" la khong truyen gi
-	Title       string      `json:"title" gorm:"column:title"`
-	Description string      `json:"description" gorm:"column:description"`
-	Status      *ItemStatus `json:"status" gorm:"column:status"`
-}
-
-type TodoItemUpdate struct {
-	Title       string  `json:"title"`
-	Description *string `json:"description"` //vì gorm sẽ dưa vào chuỗi rỗng hoặc khác new để (bỏ qua update ) khi là con trỏ thì sẽ trỏ tới 1 giá trị new -> gorm sẽ update dù chơi chuỗi rỗng
-	Status      string  `json:"status"`
-}
-
-//Dùng chung
-
-func (TodoItem) TableName() string {
-	return "todo_items" // ten bang sẽ tác động đến
-}
-
-//Hàm để GORM insert struct xuống db
-
-// func(reciver) function_name kieuDL
-func (TodoItemCreation) TableName() string {
-	return TodoItem{}.TableName() // ten bang luc nay cung la todo_items
-	//ToDoItem tác động lên bảng todo_items nên mình chỉ cần return TableName(vì thằng này cũng cần bảng todo_items)
-}
-
-func (TodoItemUpdate) TableName() string {
-	return TodoItem{}.TableName()
-}
 
 func CreateItem(db *gorm.DB) func(context *gin.Context) {
 
 	return func(context *gin.Context) {
-		var data TodoItemCreation // truyen struct can lam viec
+		var data entity.TodoItemCreation // truyen struct can lam viec
 		//ShouldBind dạng any gửi form-data hay json cũng được
 		if err := context.ShouldBind(&data); err != nil { // có lỗi
 			context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -145,16 +28,14 @@ func CreateItem(db *gorm.DB) func(context *gin.Context) {
 			context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		context.JSON(http.StatusOK, gin.H{
-			"data": data.Id, //đã tạo data với Id.
-		})
+		context.JSON(http.StatusOK, common.SimpleSuccessResponse(data)) //hoac data.Id (thi chi hien id)
 	}
 }
 
 func GetItem(db *gorm.DB) func(*gin.Context) {
 
 	return func(context *gin.Context) {
-		var data = TodoItem{} //Nhan data
+		var data = entity.TodoItem{} //Nhan data
 		//err != null ->  co loi xay ra
 		id, err := strconv.Atoi(context.Param("id")) //lay params id
 		if err != nil {                              // neu null
@@ -169,16 +50,14 @@ func GetItem(db *gorm.DB) func(*gin.Context) {
 			return
 		}
 
-		context.JSON(http.StatusOK, gin.H{
-			"data": data,
-		})
+		context.JSON(http.StatusOK, common.SimpleSuccessResponse(data))
 
 	}
 
 }
 func UpdateItem(db *gorm.DB) func(context *gin.Context) {
 	return func(context *gin.Context) {
-		var data = TodoItemUpdate{} //Nhan data
+		var data = entity.TodoItemUpdate{} //Nhan data
 		//err != null ->  co loi xay ra
 		id, err := strconv.Atoi(context.Param("id")) //lay params id
 		if err != nil {                              // neu null
@@ -200,9 +79,7 @@ func UpdateItem(db *gorm.DB) func(context *gin.Context) {
 			return
 		}
 
-		context.JSON(http.StatusOK, gin.H{
-			"data": true,
-		})
+		context.JSON(http.StatusOK, common.SimpleSuccessResponse(true))
 
 	}
 }
@@ -217,14 +94,12 @@ func DeleteItem(db *gorm.DB) func(*gin.Context) {
 			return
 		}
 		//Do mình không có struct nào để quét nên phải chỉ rõ table nào nó làm việc
-		if err := db.Table(TodoItem{}.TableName()).Where("id = ?", id).Delete(nil).Error; err != nil { //db.First (tim kiem 1 hang theo id)
+		if err := db.Table(entity.TodoItem{}.TableName()).Where("id = ?", id).Delete(nil).Error; err != nil { //db.First (tim kiem 1 hang theo id)
 			context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 
-		context.JSON(http.StatusOK, gin.H{
-			"data": true,
-		})
+		context.JSON(http.StatusOK, common.SimpleSuccessResponse(true))
 
 	}
 
@@ -240,14 +115,12 @@ func DeleteShortItem(db *gorm.DB) func(*gin.Context) {
 			return
 		}
 		//Do mình không có struct nào để quét nên phải chỉ rõ table nào nó làm việc (map có key là string và value la interface (là gì cũng đc)
-		if err := db.Table(TodoItem{}.TableName()).Where("id = ?", id).Updates(map[string]interface{}{"status": "Deleted"}).Error; err != nil { //db.First (tim kiem 1 hang theo id)
+		if err := db.Table(entity.TodoItem{}.TableName()).Where("id = ?", id).Updates(map[string]interface{}{"status": "Deleted"}).Error; err != nil { //db.First (tim kiem 1 hang theo id)
 			context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 
-		context.JSON(http.StatusOK, gin.H{
-			"data": true,
-		})
+		context.JSON(http.StatusOK, common.SimpleSuccessResponse(true))
 
 	}
 }
@@ -263,7 +136,7 @@ func ListItem(db *gorm.DB) func(context *gin.Context) {
 		}
 		paging.Process()
 		//Nếu không truyền gì mặc định là page 1 và limit = 10
-		var res []TodoItem // là các slide Todo( hay là List Item)
+		var res []entity.TodoItem // là các slide Todo( hay là List Item)
 
 		//Do cái deleteShort vẫn còn nên mình cần lọc ra
 
@@ -272,7 +145,7 @@ func ListItem(db *gorm.DB) func(context *gin.Context) {
 
 		//Find để tìm nhiều dòng dữ liệu và Order theo id desc (giảm -> mới trc)
 
-		if err := db.Table(TodoItem{}.TableName()).Count(&paging.Total).Error; err != nil {
+		if err := db.Table(entity.TodoItem{}.TableName()).Count(&paging.Total).Error; err != nil {
 			context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -282,11 +155,7 @@ func ListItem(db *gorm.DB) func(context *gin.Context) {
 			context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		context.JSON(http.StatusOK, gin.H{
-			"paging": paging,
-			"data":   res, //đã tạo data với Id.
-
-		})
+		context.JSON(http.StatusOK, common.NewSuccessResponse(paging, res, nil))
 	}
 }
 

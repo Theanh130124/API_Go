@@ -3,6 +3,10 @@ package common
 // 1 lưu ý là tên các attribute của struct đều phải viết hoa chữ đầu , để truyền json đc
 
 // interface là truyền cái gì cũng được
+
+//Do minh viet thuong successRes nen ben ngoai khong thay nen can
+
+// 2 phuong thuc new va simple
 type successRes struct {
 	Data   interface{} `json:"data"`
 	Paging interface{} `json:"paging"`
