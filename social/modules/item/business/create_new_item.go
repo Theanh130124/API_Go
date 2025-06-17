@@ -15,6 +15,7 @@ type createItemBiz struct {
 	store CreateItemStorage
 }
 
+// Xu ly du lieu truoc khi goi xuong storage
 func (biz *createItemBiz) CreateItem(ctx context.Context, data *entity.TodoItemCreation) error {
 	title := strings.TrimSpace(data.Title) //TrimSpace bo khoang trang 2 dau
 	if title == "" {                       //neu bi bo trong

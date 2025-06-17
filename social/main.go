@@ -16,29 +16,6 @@ import (
 	"strconv"
 )
 
-func GetItem(db *gorm.DB) func(*gin.Context) {
-
-	return func(context *gin.Context) {
-		var data = entity.TodoItem{} //Nhan data
-		//err != null ->  co loi xay ra
-		id, err := strconv.Atoi(context.Param("id")) //lay params id
-		if err != nil {                              // neu null
-			context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		//db.Where("id = ?", id).First(&data)  hoăc
-		data.Id = id // tim kiem o dk id (Thay vì mình viet như nay minh se viet Where trong kia cai nao cũng đc )
-
-		if err := db.First(&data).Error; err != nil { //db.First (tim kiem 1 hang theo id)
-			context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-
-		context.JSON(http.StatusOK, common.SimpleSuccessResponse(data))
-
-	}
-
-}
 func UpdateItem(db *gorm.DB) func(context *gin.Context) {
 	return func(context *gin.Context) {
 		var data = entity.TodoItemUpdate{} //Nhan data
@@ -197,7 +174,7 @@ func main() {
 		items.POST("", ginItem.CreateItem(db))
 
 		items.GET("", ListItem(db))
-		items.GET("/:id", GetItem(db))
+		items.GET("/:id", ginItem.GetItem(db))
 		items.PATCH("/:id", UpdateItem(db))
 		//Gin sẽ phân tích:
 		//
