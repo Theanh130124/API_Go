@@ -7,6 +7,7 @@ import (
 
 var (
 	ErrTitleIsBlank = errors.New("title cannot blank")
+	ErrItemDeleted  = errors.New("item is deleted")
 )
 
 // Phần json là tên key gửi trên postman

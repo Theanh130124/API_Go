@@ -66,26 +66,6 @@ func DeleteItem(db *gorm.DB) func(*gin.Context) {
 
 }
 
-// Thât ra là update nhưng trang thái Deleted
-func DeleteShortItem(db *gorm.DB) func(*gin.Context) {
-
-	return func(context *gin.Context) {
-		id, err := strconv.Atoi(context.Param("id")) //lay params id
-		if err != nil {                              // neu null
-			context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		//Do mình không có struct nào để quét nên phải chỉ rõ table nào nó làm việc (map có key là string và value la interface (là gì cũng đc)
-		if err := db.Table(entity.TodoItem{}.TableName()).Where("id = ?", id).Updates(map[string]interface{}{"status": "Deleted"}).Error; err != nil { //db.First (tim kiem 1 hang theo id)
-			context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-
-		context.JSON(http.StatusOK, common.SimpleSuccessResponse(true))
-
-	}
-}
-
 func ListItem(db *gorm.DB) func(context *gin.Context) {
 
 	return func(context *gin.Context) {
@@ -187,7 +167,7 @@ func main() {
 		//Hàm DeleteItem(db) được gọi với id = "deleteShort" → lỗi strconv.Atoi("deleteShort") → lỗi 400 hoặc 404.
 		//
 		//Hàm DeleteShortItem sẽ không bao giờ được gọi, vì route /:id đã match trước rồi.
-		items.DELETE("/deleteShort/:id", DeleteShortItem(db)) // phai dat tren  items.DELETE("/:id", DeleteItem(db))
+		items.DELETE("/deleteShort/:id", ginItem.DeleteShortItem(db)) // phai dat tren  items.DELETE("/:id", DeleteItem(db))
 		items.DELETE("/:id", DeleteItem(db))
 
 	}
