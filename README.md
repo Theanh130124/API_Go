@@ -33,7 +33,15 @@ main.go  -> API đầu tiên
   })
   r.Run() // listen and serve on 0.0.0.0:8080 (for windows "localhost:8080")
 ``
-
+Note
+```
+type ListItemStorage interface {
+	ListItem(ctx context.Context,
+		filter *entity.Filter, // truyen con tro thi co the nil cho truong du lieu nay (con neu khong truyen thi filter luon phai truyen vao)
+		paging *common.Paging,
+		moreKey ...string) ([]*entity.TodoItem, error) //Tra ve []TodoItem hoac error
+}
+```
 
 
 <h1>Install GORM </h1>
@@ -49,4 +57,8 @@ Clean architecture
 ![img.png](img.png)
 
 ![img_1.png](img_1.png)
+
+
+
+
 

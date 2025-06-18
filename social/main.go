@@ -37,39 +37,40 @@ func DeleteItem(db *gorm.DB) func(*gin.Context) {
 
 }
 
-func ListItem(db *gorm.DB) func(context *gin.Context) {
-
-	return func(context *gin.Context) {
-		var paging common.Paging
-
-		if err := context.ShouldBind(&paging); err != nil { // có lỗi
-			context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		paging.Process()
-		//Nếu không truyền gì mặc định là page 1 và limit = 10
-		var res []entity.TodoItem // là các slide Todo( hay là List Item)
-
-		//Do cái deleteShort vẫn còn nên mình cần lọc ra
-
-		// <> là khác
-		db = db.Where("status <> ?", "Deleted")
-
-		//Find để tìm nhiều dòng dữ liệu và Order theo id desc (giảm -> mới trc)
-
-		if err := db.Table(entity.TodoItem{}.TableName()).Count(&paging.Total).Error; err != nil {
-			context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-
-		if err := db.Order("id desc").Offset((paging.Page - 1) * paging.Limit).
-			Limit(paging.Limit).Find(&res).Error; err != nil { //Create truyền dữ liệu phải là &data (rút con trỏ để dữ liêu tác động thật vào db)
-			context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		context.JSON(http.StatusOK, common.NewSuccessResponse(paging, res, nil))
-	}
-}
+//
+//func ListItem(db *gorm.DB) func(context *gin.Context) {
+//
+//	return func(context *gin.Context) {
+//		var paging common.Paging
+//
+//		if err := context.ShouldBind(&paging); err != nil { // có lỗi
+//			context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+//			return
+//		}
+//		paging.Process()
+//		//Nếu không truyền gì mặc định là page 1 và limit = 10
+//		var res []entity.TodoItem // là các slide Todo( hay là List Item)
+//
+//		//Do cái deleteShort vẫn còn nên mình cần lọc ra
+//
+//		// <> là khác
+//		db = db.Where("status <> ?", "Deleted")
+//
+//		//Find để tìm nhiều dòng dữ liệu và Order theo id desc (giảm -> mới trc)
+//
+//		if err := db.Table(entity.TodoItem{}.TableName()).Count(&paging.Total).Error; err != nil {
+//			context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+//			return
+//		}
+//
+//		if err := db.Order("id desc").Offset((paging.Page - 1) * paging.Limit).
+//			Limit(paging.Limit).Find(&res).Error; err != nil { //Create truyền dữ liệu phải là &data (rút con trỏ để dữ liêu tác động thật vào db)
+//			context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+//			return
+//		}
+//		context.JSON(http.StatusOK, common.NewSuccessResponse(paging, res, nil))
+//	}
+//}
 
 func main() {
 	dsn := os.Getenv("DB_CONN_STR")
@@ -124,7 +125,7 @@ func main() {
 
 		items.POST("", ginItem.CreateItem(db))
 
-		items.GET("", ListItem(db))
+		items.GET("", ginItem.ListItem(db))
 		items.GET("/:id", ginItem.GetItem(db))
 		items.PATCH("/:id", ginItem.UpdateItem(db))
 		//Gin sẽ phân tích:
