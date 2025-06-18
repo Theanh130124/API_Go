@@ -16,35 +16,6 @@ import (
 	"strconv"
 )
 
-func UpdateItem(db *gorm.DB) func(context *gin.Context) {
-	return func(context *gin.Context) {
-		var data = entity.TodoItemUpdate{} //Nhan data
-		//err != null ->  co loi xay ra
-		id, err := strconv.Atoi(context.Param("id")) //lay params id
-		if err != nil {                              // neu null
-			context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-
-		//ShouldBind dạng any gửi form-data hay json cũng được
-		if err := context.ShouldBind(&data); err != nil { // có lỗi
-			context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-
-		//db.Where("id = ?", id).First(&data)  hoăc
-		//data.Id = id                                 //Thay vì viết data.Id = id
-		//Updates -> truyền gì thì update cái đó (không truyền k update)
-		if err := db.Where("id =?", id).Updates(&data).Error; err != nil {
-			context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-
-		context.JSON(http.StatusOK, common.SimpleSuccessResponse(true))
-
-	}
-}
-
 // Xóa luôn khỏi todo
 func DeleteItem(db *gorm.DB) func(*gin.Context) {
 
@@ -155,7 +126,7 @@ func main() {
 
 		items.GET("", ListItem(db))
 		items.GET("/:id", ginItem.GetItem(db))
-		items.PATCH("/:id", UpdateItem(db))
+		items.PATCH("/:id", ginItem.UpdateItem(db))
 		//Gin sẽ phân tích:
 		//
 		///deleteShort/1 → trùng với pattern /:id (vì :id là wildcard).
