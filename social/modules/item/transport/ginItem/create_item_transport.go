@@ -16,7 +16,7 @@ func CreateItem(db *gorm.DB) func(context *gin.Context) {
 		var data entity.TodoItemCreation // truyen struct can lam viec
 		//ShouldBind dạng any gửi form-data hay json cũng được
 		if err := context.ShouldBind(&data); err != nil { // có lỗi
-			context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			context.JSON(http.StatusBadRequest, err)
 			return
 		}
 

@@ -5,6 +5,10 @@ import (
 	"social/common"
 )
 
+const (
+	EntityName = "Item"
+)
+
 var (
 	ErrTitleIsBlank = errors.New("title cannot blank")
 	ErrItemDeleted  = errors.New("item is deleted")

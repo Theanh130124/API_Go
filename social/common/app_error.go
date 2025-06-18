@@ -7,9 +7,9 @@ import (
 
 type AppError struct {
 	StatusCode int    `json:"status_code"`
-	RootErr    error  `json:"-"`
+	RootErr    error  `json:"-"`         //loi goc lỗi golang bắt
 	Message    string `json:"message"`   //Bao loi cho endUser
-	Log        string `json:"log"`       //Loi lay tu rootErr
+	Log        string `json:"log"`       // thong báo Loi lay tu rootErr (loi goc lỗi golang bắt)
 	Key        string `json:"error_key"` //Custom key(da ngon ngu)
 }
 
@@ -75,4 +75,8 @@ func ErrInvalidRequest(err error) *AppError {
 // Loi Runtime tren server
 func ErrInternal(err error) *AppError {
 	return NewFullErrorResponse(http.StatusInternalServerError, err, "Something went wrong in the server", err.Error(), "ErrInternal")
+}
+
+func RecordNotFound(err error) *AppError {
+	return NewFullErrorResponse(http.StatusNotFound, err, "Record not found", err.Error(), "ErrRecordNotFound")
 }
