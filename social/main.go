@@ -118,12 +118,17 @@ func main() {
 
 	r := gin.Default()
 
-	api := r.Group("/api")
+	//Ap dung middleware cho tat ca api
+
+	//r.Use(middleware.Recovery())
+
+	//hoac de middleware trong nay
+	api := r.Group("/api") //middleware.Recovery()
 
 	{
 		items := api.Group("/items")
 
-		items.POST("", ginItem.CreateItem(db))
+		items.POST("", ginItem.CreateItem(db)) // hoac bo trong tung api middleware.Recovery()
 
 		items.GET("", ginItem.ListItem(db))
 		items.GET("/:id", ginItem.GetItem(db))
